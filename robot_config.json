@@ -1,0 +1,37 @@
+{
+  "wheels": {
+    "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_XXXXXXXXXX-if00",
+    "baudrate": 1000000,
+    "left_id": 7,
+    "right_id": 8,
+    "invert_left": true,
+    "invert_right": false,
+    "encoder_flip_left": false,
+    "encoder_flip_right": false,
+    "max_units": 2000,
+    "min_motor_voltage": 6.0
+  },
+  "geometry": {
+    "wheel_diameter_m": 0.1217,
+    "track_width_m": 0.5129
+  },
+  "calibration": {
+    "speed_units_per_mps": 10657.6,
+    "calibrated": false,
+    "notes": "Values above were measured on the author's robot. Run calibrate_base.py straight / rotate on yours; it sets calibrated to true."
+  },
+  "control": {
+    "tick_hz": 30,
+    "smoothing": 0.18,
+    "command_timeout_s": 0.5,
+    "preserve_turn_ratio": false,
+    "stop_threshold_units": 5,
+    "release_on_exit": true
+  },
+  "joystick": {
+    "ws_port": 8765,
+    "deadzone": 0.08,
+    "curve_exponent": 1.7,
+    "rotate_degrees": 0
+  }
+}

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>XLeRobot 遥控器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.2/nipplejs.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0d;
+    --accent: #4f8cff;
+    --accent-dim: #2a4a7a;
+    --text-dim: #6b7280;
+    --danger: #ef4444;
+    --ok: #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  #status {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top, 16px));
+    left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    color: var(--text-dim);
+    z-index: 10;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--danger);
+    transition: background 0.3s;
+  }
+  .dot.connected { background: var(--ok); }
+
+  #joystick-zone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #readout {
+    position: fixed;
+    bottom: max(28px, env(safe-area-inset-bottom, 28px));
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+  }
+
+  #stop-btn {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top, 16px));
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--danger);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border: none;
+    z-index: 20;
+    box-shadow: 0 2px 12px rgba(239,68,68,0.5);
+  }
+  #stop-btn:active {
+    background: #b91c1c;
+    transform: scale(0.95);
+  }
+
+  #hint {
+    position: fixed;
+    top: max(46px, calc(env(safe-area-inset-top, 0px) + 46px));
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 12px;
+    color: #3f3f46;
+  }
+</style>
+</head>
+<body>
+  <div id="status"><span class="dot" id="dot"></span><span id="status-text">连接中…</span></div>
+  <button id="stop-btn" ontouchstart="emergencyStop()" onclick="emergencyStop()">急停</button>
+  <div id="hint">按住圆盘拖动方向</div>
+  <div id="joystick-zone"></div>
+  <div id="readout">x 0.00 &nbsp;&nbsp; y 0.00</div>
+
+<script>
+  // 自动使用打开本页面的那台机器的地址（树莓派上用 python3 -m http.server 8000 提供本页面）
+  // 如果直接双击本地文件打开，location.hostname 为空，就退回到下面的地址（改成你的树莓派 IP）
+  // If you open this file directly (file://), set your robot's IP here.
+  const SERVER_IP = location.hostname || "raspberrypi.local";
+  const WS_PORT   = 8765;
+
+  let ws;
+  let connected = false;
+
+  function connect() {
+    ws = new WebSocket(`ws://${SERVER_IP}:${WS_PORT}`);
+    ws.onopen = () => {
+      connected = true;
+      document.getElementById('dot').classList.add('connected');
+      document.getElementById('status-text').textContent = '已连接';
+    };
+    ws.onclose = () => {
+      connected = false;
+      document.getElementById('dot').classList.remove('connected');
+      document.getElementById('status-text').textContent = '已断开 · 重连中';
+      setTimeout(connect, 1000);
+    };
+    ws.onerror = () => { ws.close(); };
+  }
+  connect();
+
+  let currentX = 0, currentY = 0;
+
+  function sendState() {
+    if (connected && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ x: currentX, y: currentY }));
+    }
+    document.getElementById('readout').textContent =
+      `x ${currentX.toFixed(2)}   y ${currentY.toFixed(2)}`;
+  }
+
+  function emergencyStop() {
+    currentX = 0;
+    currentY = 0;
+    // 连发几次确保不受单次丢包影响
+    sendState();
+    setTimeout(sendState, 50);
+    setTimeout(sendState, 100);
+  }
+
+  // 🛡️ 多重安全网：任何可能导致摇杆"卡住不归零"的情况都强制急停
+  // 防止 nipplejs 在 iOS Safari 上偶发 touchend 未触发导致的卡死
+  document.addEventListener('touchend', emergencyStop, { passive: true });
+  document.addEventListener('touchcancel', emergencyStop, { passive: true });
+  window.addEventListener('pagehide', emergencyStop);
+  window.addEventListener('blur', emergencyStop);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) emergencyStop();
+  });
+
+  // 心跳：摇杆保持不动时也持续发送当前值，避免服务端失联保护误触发
+  setInterval(sendState, 100);
+
+  const zone = document.getElementById('joystick-zone');
+  const manager = nipplejs.create({
+    zone: zone,
+    mode: 'static',
+    position: { left: '50%', top: '50%' },
+    color: '#4f8cff',
+    size: 190,
+    restOpacity: 0.55
+  });
+
+  manager.on('move', (evt, data) => {
+    if (!data.vector) return;
+    currentX = Math.max(-1, Math.min(1, data.vector.x));
+    currentY = Math.max(-1, Math.min(1, data.vector.y));
+    sendState();
+  });
+
+  manager.on('end', () => {
+    currentX = 0;
+    currentY = 0;
+    sendState();
+  });
+</script>
+</body>
+</html>
