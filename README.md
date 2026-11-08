@@ -1,92 +1,183 @@
 # XLeRobot 0.4 Differential-Drive Base: Teleop + Odometry
 
-[中文说明见下方](#中文说明)
-
 <p align="center">
   <img src="docs/demo.gif" height="480" alt="XLeRobot 0.4 driven with the phone joystick">
   &nbsp;&nbsp;
   <img src="docs/joystick.jpg" height="480" alt="Phone joystick page">
 </p>
-<p align="center"><sub>Driving with the phone joystick (2× speed) · the joystick page / 手机摇杆遥控（2倍速）与遥控页面</sub></p>
+<p align="center"><sub>Driving with the phone joystick (2× speed) · the joystick page</sub></p>
 
-A drop-in base driver for the **XLeRobot 0.4.0 two-wheel differential-drive base** (2 × Feetech STS3215 wheel motors). It gives you:
+Drive the **XLeRobot 0.4.0 two-wheel base** from your phone. Plug the robot's wheel board into a computer (Windows, Mac, Linux or a Raspberry Pi), start one script, and open a web page on your phone. No app to install.
 
-- **Phone joystick teleop** over WebSocket. Open a web page on your phone and drive; no app to install.
-- **Wheel odometry** from the STS3215 encoders: x, y, heading, and measured speed.
-- **A physical-unit velocity interface**: `set_velocity(v m/s, ω rad/s)`, shared by the joystick and any program you write.
-- **UDP interfaces** for your own navigation code: send velocity commands in, receive odometry out, without touching the serial port.
-- **Calibration scripts** that measure the real speed scale, wheel diameter and track width, then write them to the config.
-- **A fake-motor mode** (`--port fake`) and tests, so you can try everything without hardware.
+It also gives you:
 
-Terminal messages and the phone page are in Chinese; the code and comments are in English.
+- **Wheel odometry**: the robot's position (x, y), heading and measured speed, read from the motor encoders.
+- **A simple velocity interface**: `set_velocity(v m/s, ω rad/s)`, shared by the joystick and any program you write.
+- **UDP ports** for your own navigation code: send speed commands in, get odometry out.
+- **Calibration scripts** that measure your robot's real wheel size and speed.
+- **A fake-motor mode**, so you can try everything without a robot.
 
-The official XLeRobot docs cover the 0.3 omni-wheel base; this project fills the gap for the 0.4 two-wheel version.
+The official XLeRobot docs cover the 0.3 omni-wheel base; this project covers the 0.4 two-wheel version.
 
-## Hardware
+> Terminal messages and the phone page are in Chinese. The code, comments and this README are in English.
 
-| Item | Default in `robot_config.json` |
-| --- | --- |
-| Wheel motors | 2 × STS3215, IDs **7 (left)** and **8 (right)**, 1 Mbps |
-| Wheels | ~125 mm diameter (calibrate for the exact value) |
-| Track width | ~508 mm (calibrate for the effective value) |
-| Controller | Raspberry Pi 5 (Raspberry Pi OS) or any PC with Python 3.9+ |
-| Motor bus | USB serial board (e.g. CH340 / `1a86`) |
+## Contents
 
-The geometry and speed-scale values in the config were measured on the author's robot. They are a good starting point, but run the calibration on yours.
+1. [What you need](#1-what-you-need)
+2. [Install](#2-install)
+3. [Try it without the robot](#3-try-it-without-the-robot)
+4. [Connect the robot](#4-connect-the-robot)
+5. [Drive with your phone](#5-drive-with-your-phone)
+6. [Calibrate](#6-calibrate-recommended)
+7. [UDP interfaces for your own code](#7-udp-interfaces-for-your-own-code)
+8. [Configuration](#8-configuration)
+9. [Troubleshooting](#9-troubleshooting)
+10. [Files](#10-files)
 
-## Files
+## 1. What you need
 
-| File | Purpose |
-| --- | --- |
-| `joystick_server.py` | Main program: phone joystick server + UDP odometry/command ports |
-| `joystick4.html` | Phone joystick page |
-| `start.sh` | Starts the web page server (8000) and the joystick server (8765) together |
-| `base_driver.py` | Differential-drive driver, fail-safe, odometry |
-| `sts_bus.py` | STS3215 serial protocol (SYNC WRITE for speeds) |
-| `joystick_mapping.py` | Joystick (x, y) → (v, ω), with deadzone and response curve |
-| `control_arbiter.py` | Gives control to one phone page at a time |
-| `odom_udp.py` | Publishes odometry over UDP |
-| `calibrate_base.py` | Calibration: `check`, `straight`, `rotate` |
-| `fake_sts.py` | Simulated STS3215 motors |
-| `robot_config.json` | All parameters |
-| `tests/` | Tests; no hardware or extra packages needed |
+- **XLeRobot 0.4.0 base**: 2 × Feetech STS3215 wheel motors, IDs **7 (left)** and **8 (right)**, on a USB serial board.
+- **The motor power supply connected** (12 V). USB alone powers the board but not the motors.
+- **A computer** next to or on the robot: Windows 10/11, macOS, Linux, or a Raspberry Pi 5.
+- **Python 3.9 or newer.**
+- **A phone on the same Wi-Fi** as the computer.
 
-## Quick start
+## 2. Install
+
+### Windows
+
+1. Install Python from [python.org](https://www.python.org/downloads/). On the first installer screen, tick **"Add python.exe to PATH"**.
+2. Download this project: click the green **Code** button above → **Download ZIP**, then unzip it. Or use `git clone` if you have Git.
+3. Open the unzipped folder in File Explorer, click the address bar, type `cmd` and press Enter. A Command Prompt opens in that folder.
+4. Run:
+
+```bat
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+If `python` is not found, use `py` instead (for example `py -m venv venv`).
+
+### macOS, Linux, Raspberry Pi
 
 ```bash
 git clone https://github.com/Jinghao-X/xlerobot-diffdrive-teleop.git
 cd xlerobot-diffdrive-teleop
-python3 -m venv venv && source venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-python joystick_server.py --port fake   # try it with simulated motors
-python tests/test_base.py && python tests/test_control.py && python tests/test_udp.py
 ```
 
-## Running on a Raspberry Pi 5
+**Each time** you open a new terminal later, go into the folder and activate the environment again: `venv\Scripts\activate` on Windows, or `source venv/bin/activate` on Mac/Linux/Pi.
 
-1. **Serial permission:** `sudo usermod -aG dialout $USER`, then log out and back in.
-2. **Stable port name:** run `ls /dev/serial/by-id/` and put the full path of the wheel board into `wheels.port`. Names like `/dev/ttyACM0` can swap after re-plugging.
-3. **Start:** `./start.sh`. It prints a URL like `http://192.168.x.x:8000/joystick4.html`; open it on a phone on the same Wi-Fi.
-4. Keep **only one** joystick page open while driving (see Troubleshooting).
-
-## First drive and calibration
-
-Use a flat floor, 1.5 m of free space ahead, and a ~0.8 m circle for rotating. Keep a hand near the robot; Ctrl+C stops at any time.
+## 3. Try it without the robot
 
 ```bash
-python calibrate_base.py check      # encoder direction, ~1 s (lift the wheels the first time)
-python calibrate_base.py straight   # speed scale + real wheel diameter, ~10 s, needs a tape measure
-python calibrate_base.py rotate     # effective track width, ~2 turns in place
+python joystick_server.py --port fake
 ```
 
-Each step shows its result and asks before writing to the config.
+`--port fake` uses simulated motors. You should see `✅ 底盘已启动` ("base started"). Press **Ctrl+C** to stop.
 
-## UDP interfaces (for your own navigation)
+Optional, to run the tests:
 
-Both ports bind to **127.0.0.1 only**, so only programs on the robot itself can drive it. Messages are one JSON object per datagram.
+```bash
+python tests/test_base.py
+python tests/test_control.py
+python tests/test_udp.py
+```
 
-**Odometry out, `127.0.0.1:5601`, ~30 Hz** (change with `--odom-udp HOST:PORT`, disable with `--odom-udp off`):
+## 4. Connect the robot
+
+Plug the wheel board into the computer with USB, turn on the motor power, then find the board's serial port name.
+
+| System | How to find the port | Looks like |
+| --- | --- | --- |
+| **Windows** | Open **Device Manager** → **Ports (COM & LPT)**. Unplug and re-plug the board to see which entry appears. | `COM3` |
+| **Raspberry Pi / Linux** | Run `ls /dev/serial/by-id/` | `/dev/serial/by-id/usb-1a86_USB_Single_Serial_...-if00` |
+| **macOS** | Run `ls /dev/cu.*` | `/dev/cu.usbmodem...`, `/dev/cu.usbserial-...` or `/dev/cu.wchusbserial...` |
+
+Open `robot_config.json` in a text editor and put the port name in `wheels.port`:
+
+```json
+"wheels": {
+  "port": "COM3",
+```
+
+Don't want to edit the file? Pass the port when starting instead, e.g. `--port COM3`.
+
+**Windows:** if no port appears in Device Manager, or it shows a yellow warning sign, install the CH340 USB-serial driver (search "CH340 driver" on the manufacturer's site, WCH).
+
+**Raspberry Pi / Linux:** give your user serial access once, then log out and back in:
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
+On Linux, use the `/dev/serial/by-id/...` name rather than `/dev/ttyACM0`, because `ttyACM` numbers can swap after re-plugging.
+
+## 5. Drive with your phone
+
+**Before the first drive, lift the robot so the wheels are off the ground**, until you've checked the directions are right.
+
+**Start**
+
+- **Windows:** double-click `start.bat`, or run `start.bat` in the Command Prompt. Add a port if needed: `start.bat --port COM3`.
+- **Mac / Linux / Pi:** `./start.sh` (or `./start.sh --port /dev/cu.usbmodem...`).
+
+The script starts two things: a small web server that serves the joystick page (port 8000), and the robot control server (port 8765).
+
+**Open the page on your phone**
+
+The terminal prints a line like:
+
+```
+📱 手机打开 / Open on your phone: http://192.168.1.23:8000/joystick4.html
+```
+
+Open that address in your phone's browser. The phone must be on the **same Wi-Fi** as the computer.
+
+**Windows:** the first time, Windows Firewall asks whether to allow Python. Tick **Private networks** and click **Allow**, or the phone can't connect.
+
+**Using the page**
+
+- The dot at the top turns **green** when connected. Red means "connecting…".
+- **Hold and drag the joystick**: up = forward, down = backward, left/right = turn.
+- **Let go** and the robot stops. Switching to another app or locking the phone also stops it.
+- The red **急停** button is an **emergency stop**.
+- If the phone loses connection, the robot stops by itself within 0.5 s.
+- Keep **only one** joystick page open. A second page (for example a forgotten laptop tab) can make driving jerky.
+
+**Wrong direction?**
+
+- Robot goes backward when you push forward → in `robot_config.json`, flip both `invert_left` and `invert_right` (`true` ↔ `false`).
+- Robot spins when you push forward → flip just one of them.
+
+**Stop the program:** press **Ctrl+C** in the terminal. The wheels are released, so you can push the robot by hand.
+
+## 6. Calibrate (recommended)
+
+Calibration measures your robot's real wheel diameter, speed and track width, so the speeds and odometry are accurate. The default values were measured on the author's robot.
+
+You need a flat floor, about 1.5 m of free space ahead, and a ~0.8 m circle for turning. Keep a hand near the robot; **Ctrl+C stops it at any time**. Run the three steps in order:
+
+```bash
+python calibrate_base.py check      # 1. checks encoder direction, ~1 s (lift the wheels the first time)
+python calibrate_base.py straight   # 2. drives straight, ~10 s; you measure the distance with a tape measure
+python calibrate_base.py rotate     # 3. turns in place ~2 times; you count the degrees
+```
+
+Each step explains what it will do, asks before moving, shows the result, and asks before saving to `robot_config.json`. The prompts are in Chinese:
+
+- `[y/N]` questions: type `y` and press Enter to go ahead, or just Enter to cancel.
+- `straight` asks how many **centimetres** the robot actually moved (`实际前进了多少厘米`). Measure it and type the number.
+- `rotate` asks how many **degrees** it actually turned (`实际转了多少度`). For example, 2 full turns plus 90° = `810`.
+
+## 7. UDP interfaces for your own code
+
+While `joystick_server.py` is running, your own program on the same computer can drive the robot and read its position. Both ports listen on **127.0.0.1 only**, so other devices on the network can't drive the robot. Each message is one JSON object per UDP packet.
+
+**Odometry out: `127.0.0.1:5601`, about 30 times per second**
 
 ```json
 {"type": "odom", "boot": "1730000000.123", "seq": 42, "t": 12345.678,
@@ -95,59 +186,104 @@ Both ports bind to **127.0.0.1 only**, so only programs on the robot itself can 
  "wheel_diameter_m": 0.1217, "track_width_m": 0.5129}
 ```
 
-- `x, y` in metres, `theta` in radians (counter-clockwise positive), in the frame where the program started. x is forward.
-- `t` is `time.monotonic()` of the encoder read (CLOCK_MONOTONIC, shared by all processes on Linux), so you can match it with camera timestamps.
-- `boot` changes every time the program restarts and the odometry resets to (0, 0, 0). Re-anchor when it changes.
+- `x`, `y`: metres; `theta`: radians, counter-clockwise positive. Measured from where the robot was when the program started; x points forward.
+- `t`: `time.monotonic()` at the encoder read, useful for matching with camera timestamps.
+- `boot`: changes every time the program restarts, which resets the position to (0, 0, 0).
 - `healthy: false` means encoder reads are failing.
+- Change the address with `--odom-udp HOST:PORT`, or turn it off with `--odom-udp off`.
 
-**Velocity commands in, `127.0.0.1:5603`** (change with `--nav-port`, disable with `--nav-port 0`):
+**Speed commands in: `127.0.0.1:5603`**
 
 ```json
 {"type": "cmd", "v": 0.15, "w": 0.0}
 ```
 
-- `v` in m/s (forward +), `w` in rad/s (counter-clockwise +). Send at 10 Hz or faster.
-- **Fail-safe:** if no command arrives for `control.command_timeout_s` (0.5 s), the wheels stop.
-- **The phone always wins:** while the joystick is pushed, UDP commands are ignored for 1 s after the last push. The page's idle heartbeats do not interrupt navigation.
+- `v`: forward speed in m/s (negative = backward). `w`: turning speed in rad/s (positive = left).
+- Send at least **10 times per second**. If commands stop for 0.5 s, the robot stops.
+- **The phone always wins:** while someone pushes the joystick, UDP commands are ignored until 1 s after they let go.
+- Change the port with `--nav-port`, or turn it off with `--nav-port 0`.
 
-Minimal client:
+**Example: drive forward slowly for 2 seconds and print the position**
 
 ```python
 import json, socket, time
+
 cmd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 odom = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 odom.bind(("127.0.0.1", 5601))
+
 end = time.monotonic() + 2.0
-while time.monotonic() < end:                       # drive forward slowly for 2 s
+while time.monotonic() < end:
     cmd.sendto(json.dumps({"type": "cmd", "v": 0.1, "w": 0.0}).encode(), ("127.0.0.1", 5603))
     o = json.loads(odom.recv(4096))
-    print(f"x={o['x']:.2f} y={o['y']:.2f} theta={o['theta']:.2f}")
+    print(f"x={o['x']:.2f} m  y={o['y']:.2f} m  heading={o['theta']:.2f} rad")
     time.sleep(0.05)
 ```
 
-## Configuration highlights
+Run it in a second terminal while the server is running.
 
-| Key | Meaning |
+## 8. Configuration
+
+All settings are in `robot_config.json`. The ones you're most likely to change:
+
+| Setting | What it does |
 | --- | --- |
-| `wheels.invert_left/right` | Flip a motor's direction if the robot drives backwards or spins |
-| `wheels.max_units` | Speed limit in motor units (2000 ≈ 0.19 m/s with the default scale) |
-| `wheels.min_motor_voltage` | Warn at startup if the motor supply is below this (V) |
-| `control.command_timeout_s` | Fail-safe: stop if no command for this long |
-| `control.smoothing` | Acceleration smoothing (0–1, lower = smoother) |
-| `control.release_on_exit` | Turn torque off on exit so the robot can be pushed by hand |
-| `joystick.deadzone`, `curve_exponent` | Joystick feel |
+| `wheels.port` | Serial port of the wheel board (`COM3`, `/dev/serial/by-id/...`, or `fake`) |
+| `wheels.left_id`, `right_id` | Motor IDs (default 7 and 8) |
+| `wheels.invert_left`, `invert_right` | Flip a motor's direction |
+| `wheels.max_units` | Top speed (2000 ≈ 0.19 m/s with the default calibration) |
+| `wheels.min_motor_voltage` | Warn at startup if the motor supply is below this voltage |
+| `control.command_timeout_s` | Stop if no command arrives for this long (default 0.5 s) |
+| `control.smoothing` | Acceleration smoothing, 0–1; lower = gentler starts and stops |
+| `control.release_on_exit` | Release the wheels when the program exits, so the robot can be pushed |
+| `joystick.deadzone`, `curve_exponent` | How the joystick feels near the centre and at full push |
+| `joystick.ws_port` | Control server port (default 8765) |
 
-## Troubleshooting
+Calibration writes `geometry` and `calibration.speed_units_per_mps` for you.
 
-These all happened on the real robot.
+## 9. Troubleshooting
 
-- **Motors don't move, or move weakly, and the startup voltage reads ~5 V.** The motor power supply isn't connected; the board is powered only from USB. Check the 12 V supply. The driver reads the motor voltage at startup and warns below `min_motor_voltage`.
-- **Driving is jerky or stutters.** Usually two joystick pages are open, e.g. one on the phone and one in a laptop tab. A background page keeps sending "stop" heartbeats. The arbiter gives control to the active page, but close extra tabs anyway. The diagnostic line shows `忽略` (ignored) > 0 when this happens.
-- **Motors don't respond after power-up.** Torque is off after a power cycle; the driver enables it at startup. If you use other tools on the same bus, make sure they don't turn it off.
-- **Wheel mode doesn't persist after power cycling.** The mode lives in EEPROM, which must be unlocked before writing. The driver checks the mode and writes it, with unlock/lock, only if needed.
-- **Odometry jumps or encoder reads fail.** Delayed USB-serial replies corrupted reads; speeds are now sent with a single SYNC WRITE. Don't run two programs on the same serial port at once.
-- **Wheels stay locked after exit.** Fixed: torque is released on exit (`control.release_on_exit`).
-- **Robot drifts sideways when driving straight.** Make sure both wheel motors are the same model (voltage version and gear ratio), then re-run `calibrate_base.py straight`.
+**The phone page stays red ("连接中…", connecting)**
+- The phone and computer must be on the same Wi-Fi. Guest networks often block devices from seeing each other.
+- **Windows:** allow Python through Windows Firewall (Private networks). If you missed the prompt: Start → "Allow an app through Windows Firewall" → find Python → tick Private.
+- Check the terminal is still running and shows no error.
+
+**Can't open the serial port**
+- Check the port name (section 4).
+- Close any other program using the board: another copy of this script, Feetech's debug tool, Arduino serial monitor, etc. Only one program can use the port at a time.
+- **Linux/Pi:** "Permission denied" → run the `usermod` command in section 4 and log in again.
+
+**Motors don't move, or move weakly, and the startup voltage reads about 5 V**
+The motor power isn't connected; the board is running on USB power only. Check the 12 V supply. The program warns at startup when the voltage is low.
+
+**Driving is jerky or stutters**
+Usually two joystick pages are open. Close the extra one. The terminal's status line shows `忽略` (ignored) > 0 when a second page is sending messages.
+
+**Motors don't respond after power-up**
+The motors turn their torque off after a power cycle. This program turns it back on at startup; just restart it. If another tool on the same bus turned torque off, restart this program.
+
+**Odometry jumps, or encoder read failures**
+Make sure only one program is using the serial port.
+
+**Robot drifts to one side when driving straight**
+Check both wheel motors are the same model (same voltage version and gear ratio), then run `python calibrate_base.py straight` again.
+
+## 10. Files
+
+| File | Purpose |
+| --- | --- |
+| `start.bat` / `start.sh` | Start everything (Windows / Mac, Linux, Pi) |
+| `joystick_server.py` | Main program: phone joystick server + UDP ports |
+| `joystick4.html` | The phone joystick page |
+| `calibrate_base.py` | Calibration: `check`, `straight`, `rotate` |
+| `robot_config.json` | All settings |
+| `base_driver.py` | Two-wheel drive control, fail-safe, odometry |
+| `sts_bus.py` | STS3215 serial protocol |
+| `joystick_mapping.py` | Joystick position → speed and turn rate |
+| `control_arbiter.py` | Lets only one phone page control the robot at a time |
+| `odom_udp.py` | Sends odometry over UDP |
+| `fake_sts.py` | Simulated motors for `--port fake` and the tests |
+| `tests/` | Tests; no robot or extra packages needed |
 
 ## Contributing
 
@@ -156,68 +292,3 @@ Issues and pull requests are welcome. This project is independent of, and built 
 ## License
 
 [Apache License 2.0](LICENSE), the same as XLeRobot.
-
----
-
-## 中文说明
-
-这是 **XLeRobot 0.4.0 双轮差速底盘**的驱动程序，底盘用两个 Feetech STS3215 轮子电机。功能包括：
-
-- **手机遥控**：手机打开一个网页就能开，不用装 App。
-- **里程计**：从编码器算出机器人的位置 (x, y)、朝向和实际速度。
-- **物理单位接口**：`set_velocity(线速度 m/s, 角速度 rad/s)`，手机摇杆和你自己的程序共用。
-- **UDP 接口**：给你自己的导航程序用，速度指令进、里程计出，不用碰串口。
-- **标定脚本**：实测速度换算、真实轮径和有效轮距，写入配置。
-- **虚拟电机**（`--port fake`）和测试，不接硬件也能试。
-
-官方文档目前只写到 0.3 全向轮底盘，本项目补上 0.4 双轮版本。
-
-### 安装与试运行
-
-```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python joystick_server.py --port fake      # 虚拟电机试运行
-```
-
-### 在树莓派 5 上运行
-
-1. `sudo usermod -aG dialout $USER`，然后重新登录，才有串口权限。
-2. 运行 `ls /dev/serial/by-id/`，把轮子控制板的完整路径填进 `wheels.port`。不要用 `/dev/ttyACM0`，插拔后可能互换。
-3. 运行 `./start.sh`，用同一 Wi-Fi 下的手机打开它显示的网址。
-4. 遥控时只开**一个**遥控页面。
-
-### 标定
-
-地面平整，前方留 1.5 米，旋转需要直径约 0.8 米的空间。手放在机器人旁边，Ctrl+C 随时停止。
-
-```bash
-python calibrate_base.py check       # 编码器方向，约 1 秒（第一次建议把轮子架空）
-python calibrate_base.py straight    # 速度换算和真实轮径，约 10 秒，需要卷尺
-python calibrate_base.py rotate      # 有效轮距，原地转约 2 圈
-```
-
-每一步都会显示结果，确认后才写入配置。
-
-### UDP 接口
-
-两个端口都只监听本机 `127.0.0.1`，同一 Wi-Fi 下的其他设备无法控制机器人。
-
-- **里程计 5601 端口（发出，约 30 Hz）**：`x, y` 单位米，`theta` 单位弧度（逆时针为正），x 朝前；`t` 是编码器读取时的 `time.monotonic()`；`boot` 在每次重启后改变，此时里程计归零。
-- **速度指令 5603 端口（接收）**：`{"type": "cmd", "v": 0.15, "w": 0.0}`，每秒至少发 10 次。超过 0.5 秒没收到新指令就自动停车。手机摇杆优先：推摇杆时，导航指令暂停 1 秒。
-
-消息格式和示例代码见上面英文部分。
-
-### 常见问题
-
-- **电机不转或很无力，启动时电压显示约 5 V**：电机电源没接好，控制板只靠 USB 供电。请检查 12 V 电源。
-- **开起来一顿一顿的**：多半同时开了两个遥控页面，后台页面一直在发“停止”心跳。程序会把控制权交给正在操作的页面，但最好关掉多余的页面。
-- **上电后电机不响应**：断电后扭矩会关闭，程序启动时会自动打开。
-- **断电后轮子模式丢失**：模式存在 EEPROM 里，写入前必须先解锁。程序会先检查，只在需要时写入。
-- **里程计跳变或编码器读取失败**：不要让两个程序同时占用同一个串口。
-- **退出后轮子锁死**：已修复，退出时会释放扭矩（`control.release_on_exit`）。
-- **直走时跑偏**：确认两个电机型号相同（电压版本和减速比），然后重新运行 `calibrate_base.py straight`。
-
-### 许可证
-
-[Apache License 2.0](LICENSE)，与 XLeRobot 原项目一致。

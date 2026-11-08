@@ -196,8 +196,10 @@ async def main(args) -> None:
           f"{'' if cfg['calibration']['calibrated'] else '（尚未标定，仅为估计值）'}")
     print("\n" + "=" * 50)
     print(f"🚀 WebSocket 服务已启动，监听端口 {cfg['joystick']['ws_port']}")
-    print(f"📶 本机局域网IP: {get_local_ip()}")
-    print("   请把这个IP填入 joystick4.html 里的 SERVER_IP")
+    ip = get_local_ip()
+    print(f"📶 本机局域网IP / LAN IP: {ip}")
+    print(f"📱 手机打开 / Open on your phone: http://{ip}:8000/joystick4.html")
+    print("   （需要先用 start.sh / start.bat 启动网页服务 / needs the page server from start.sh or start.bat）")
     print("=" * 50 + "\n")
     if args.nav_port:
         loop = asyncio.get_running_loop()
