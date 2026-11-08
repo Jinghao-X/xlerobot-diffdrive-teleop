@@ -3,9 +3,9 @@
 [中文说明见下方](#中文说明)
 
 <p align="center">
-  <img src="docs/demo.gif" width="300" alt="XLeRobot 0.4 driven with the phone joystick">
+  <img src="docs/demo.gif" height="480" alt="XLeRobot 0.4 driven with the phone joystick">
   &nbsp;&nbsp;
-  <img src="docs/joystick.jpg" width="200" alt="Phone joystick page">
+  <img src="docs/joystick.jpg" height="480" alt="Phone joystick page">
 </p>
 <p align="center"><sub>Driving with the phone joystick (2× speed) · the joystick page / 手机摇杆遥控（2倍速）与遥控页面</sub></p>
 
